@@ -1,0 +1,390 @@
+{
+  "timestamp": "2026-11-02T18:16:14.679286",
+  "kpi_benchmarks": {
+    "wafer_map_macro_f1": {
+      "target": ">= 0.93",
+      "achieved": 0.9326,
+      "status": "PASS"
+    },
+    "excursion_detection": {
+      "target": "Detect 1.5 sigma shift within 3 lots",
+      "achieved": "22 Excursion Lots Flagged (EWMA/CUSUM)",
+      "status": "PASS"
+    },
+    "root_cause_top3_accuracy": {
+      "target": "True cause in top 3 >= 80%",
+      "achieved": "100% (Top 3: LITHO Reticle: RT-118B, WAT Vt_n Parameter Drift (+18 mV Frontend Shift), ETCH Tool & Chamber: ETCH-07 / C)",
+      "status": "PASS"
+    },
+    "latent_defect_yield_cost": {
+      "target": "DPPM down at < 0.35 pt yield cost",
+      "achieved": "Yield cost: 0.349 pts, DPPM down 59.0%",
+      "status": "PASS"
+    },
+    "test_time_reduction": {
+      "target": "8 to 15% time reduction without DPPM escape increase",
+      "achieved": "8.65% (106.4 ms saved per die)",
+      "status": "PASS"
+    },
+    "yield_forecast_mae": {
+      "target": "MAE < 1.2 yield points (Lot-level)",
+      "achieved": "Lot Holdout MAE: 2.227 pts (5-Fold CV MAE: 1.375 pts)",
+      "status": "NOT MET"
+    },
+    "copilot_rag_readiness": {
+      "target": "100% offline retrieval & grounded technical 8D drafting",
+      "achieved": "Operational (Zero external API dependencies)",
+      "status": "PASS"
+    }
+  },
+  "engine_1_wafer_map": {
+    "macro_f1": 0.9326,
+    "weighted_f1": 0.9842,
+    "classification_report": {
+      "Center": {
+        "precision": 0.9367088607594937,
+        "recall": 1.0,
+        "f1-score": 0.9673202614379085,
+        "support": 74.0
+      },
+      "Clean": {
+        "precision": 0.9911727616645649,
+        "recall": 0.9974619289340102,
+        "f1-score": 0.9943074003795066,
+        "support": 788.0
+      },
+      "Edge-Ring": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 15.0
+      },
+      "Loc": {
+        "precision": 0.9354838709677419,
+        "recall": 0.8285714285714286,
+        "f1-score": 0.8787878787878788,
+        "support": 35.0
+      },
+      "Reticle-Repeat": {
+        "precision": 0.9861111111111112,
+        "recall": 0.9861111111111112,
+        "f1-score": 0.9861111111111112,
+        "support": 72.0
+      },
+      "Scratch": {
+        "precision": 1.0,
+        "recall": 0.625,
+        "f1-score": 0.7692307692307693,
+        "support": 16.0
+      },
+      "accuracy": 0.985,
+      "macro avg": {
+        "precision": 0.9749127674171519,
+        "recall": 0.906190744769425,
+        "f1-score": 0.9326262368245289,
+        "support": 1000.0
+      },
+      "weighted avg": {
+        "precision": 0.9851025273717506,
+        "recall": 0.985,
+        "f1-score": 0.9841611989107245,
+        "support": 1000.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        74,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        786,
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        15,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        3,
+        0,
+        29,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1,
+        71,
+        0
+      ],
+      [
+        1,
+        4,
+        0,
+        0,
+        1,
+        10
+      ]
+    ],
+    "classes": [
+      "Center",
+      "Clean",
+      "Edge-Ring",
+      "Loc",
+      "Reticle-Repeat",
+      "Scratch"
+    ],
+    "feature_importances": {
+      "radial_gradient": 0.1378,
+      "reticle_pattern_score": 0.1238,
+      "edge_density": 0.0812,
+      "max_continuous_cluster": 0.08,
+      "center_density": 0.0759,
+      "circle_cluster_score": 0.0673,
+      "circle_cluster_ratio": 0.056,
+      "scratch_line_score": 0.0552,
+      "cluster_density_max": 0.055,
+      "fail_rate": 0.0493,
+      "spatial_std": 0.0468,
+      "center_to_edge_ratio": 0.0414,
+      "scratch_line_ratio": 0.0324,
+      "angular_variance": 0.0311,
+      "edge_to_center_ratio": 0.0247,
+      "donut_density": 0.0147,
+      "x_mean": 0.0112,
+      "scratch_aspect_ratio": 0.0086,
+      "y_mean": 0.0076
+    },
+    "total_samples": 1000,
+    "model_architecture": "ExtraTreesClassifier (200 trees, max_depth=12, balanced)",
+    "model_comparison": {
+      "Extra Trees (Selected Production)": {
+        "macro_f1": 0.9326,
+        "weighted_f1": 0.9842
+      },
+      "Random Forest": {
+        "macro_f1": 0.9278,
+        "weighted_f1": 0.9848
+      },
+      "Gradient Boosting": {
+        "macro_f1": 0.9177,
+        "weighted_f1": 0.981
+      }
+    }
+  },
+  "engine_2_excursion": {
+    "total_excursion_lots": 22,
+    "ewma_signals_count": 20,
+    "cusum_signals_count": 22,
+    "multivariate_anomalies_count": 30,
+    "identified_events_count": 24
+  },
+  "engine_3_root_cause": [
+    {
+      "factor": "LITHO Reticle: RT-118B",
+      "category": "Process Equipment (Physical Defect)",
+      "evidence": "Yield dropped by 6.71% (Group Yield: 83.14% vs Baseline: 89.85%), Fisher p = 3.55e-21",
+      "affected_wafers": 75,
+      "yield_impact_pts": 6.71,
+      "p_value": 3.546576178590702e-21,
+      "confidence": "High",
+      "attribution_type": "Confirmed Physical Root Cause (Validated against Fab Excursion Event)",
+      "recommended_action": "Inhibit RT-118B immediately; execute chamber purge and hardware audit.",
+      "rank": 1
+    },
+    {
+      "factor": "WAT Vt_n Parameter Drift (+18 mV Frontend Shift)",
+      "category": "Fab Metrology / Electrical Parametric Drift",
+      "evidence": "Statistically significant negative correlation (r = -0.2811, p = 1.27e-19) between inline Vt_n and sort yield; high Vt_n wafers experience 5.35% yield penalty.",
+      "affected_wafers": 147,
+      "yield_impact_pts": 5.35,
+      "p_value": 1.2735082536643312e-19,
+      "confidence": "High",
+      "attribution_type": "Confirmed Physical Root Cause (WAT Parametric Drift driving VMIN fails)",
+      "recommended_action": "Audit frontend gate oxide and halo implant recipes for lots L262226-L262231.",
+      "rank": 2
+    },
+    {
+      "factor": "ETCH Tool & Chamber: ETCH-07 / C",
+      "category": "Process Equipment (Physical Defect)",
+      "evidence": "Yield dropped by 7.98% (Group Yield: 81.88% vs Baseline: 89.85%), Fisher p = 8.75e-09",
+      "affected_wafers": 64,
+      "yield_impact_pts": 7.98,
+      "p_value": 8.753787271713983e-09,
+      "confidence": "High",
+      "attribution_type": "Confirmed Physical Root Cause (Validated against Fab Excursion Event)",
+      "recommended_action": "Inhibit ETCH-07 / C immediately; execute chamber purge and hardware audit.",
+      "rank": 3
+    },
+    {
+      "factor": "CMP Tool: CMP-01",
+      "category": "Process Equipment (Statistical Association)",
+      "evidence": "Yield dropped by 2.29% (Group Yield: 87.97% vs Baseline: 90.26%), Fisher p = 5.90e-08",
+      "affected_wafers": 400,
+      "yield_impact_pts": 2.29,
+      "p_value": 5.902976219995145e-08,
+      "confidence": "Medium",
+      "attribution_type": "Statistical Equipment Association (Correlated Commonality Variance)",
+      "recommended_action": "Audit CMP-01 maintenance logs and recipe qualification status.",
+      "rank": 4
+    },
+    {
+      "factor": "ETCH Tool: ETCH-07",
+      "category": "Process Equipment (Physical Defect)",
+      "evidence": "Yield dropped by 2.44% (Group Yield: 87.57% vs Baseline: 90.01%), Fisher p = 3.77e-05",
+      "affected_wafers": 275,
+      "yield_impact_pts": 2.44,
+      "p_value": 3.769404095236205e-05,
+      "confidence": "Medium",
+      "attribution_type": "Confirmed Physical Root Cause (Validated against Fab Excursion Event)",
+      "recommended_action": "Inhibit ETCH-07 immediately; execute chamber purge and hardware audit.",
+      "rank": 5
+    },
+    {
+      "factor": "ATE Tester: T03",
+      "category": "Process Equipment (Statistical Association)",
+      "evidence": "Yield dropped by 2.69% (Group Yield: 86.99% vs Baseline: 89.68%), Fisher p = 1.89e-04",
+      "affected_wafers": 125,
+      "yield_impact_pts": 2.69,
+      "p_value": 0.00018880884475209268,
+      "confidence": "Medium",
+      "attribution_type": "Statistical Equipment Association (Correlated Commonality Variance)",
+      "recommended_action": "Audit T03 maintenance logs and recipe qualification status.",
+      "rank": 6
+    }
+  ],
+  "engine_4_latent_defect": {
+    "total_evaluated_dies": 446715,
+    "total_burnin_fails": 700,
+    "flagged_screened_dies": 1558,
+    "yield_cost_pts": 0.349,
+    "burnin_fail_rate_flagged_pct": 26.57,
+    "burnin_fail_rate_unflagged_pct": 0.0642,
+    "dpat_only_burnin_fail_rate_pct": 35.48,
+    "gdbn_only_burnin_fail_rate_pct": 3.07,
+    "relative_risk_ratio": 413.6,
+    "baseline_dppm": 1567.0,
+    "post_screen_dppm": 642.5,
+    "dppm_reduction_pct": 59.0,
+    "precision": 0.2657,
+    "recall": 0.5914,
+    "f1_score": 0.3667,
+    "confusion_matrix": [
+      [
+        444871,
+        1144
+      ],
+      [
+        286,
+        414
+      ]
+    ]
+  },
+  "engine_5_test_optimizer": {
+    "nominal_test_time_ms": 1230.0,
+    "proposals": [
+      {
+        "proposal_id": "TTO-01",
+        "test_name": "RING_OSC (T4120)",
+        "action": "Move from 100% testing to 5% QA sample audit with upstream guardband",
+        "justification": "Parametric correlation with FMAX is r = 0.9951. Test contributes only 13 observed fails. Statistical Rule-of-Three escape bound is 47.63 DPPM.",
+        "test_time_saved_ms": 20.9,
+        "annual_savings_usd": 16251.84,
+        "escape_risk_dppm": 47.63,
+        "status": "REQUIRES_CCB_APPROVAL",
+        "governance": "Advisory (Subject to Product & Test Engineering Review)"
+      },
+      {
+        "proposal_id": "TTO-02",
+        "test_name": "ADC_INL (T6000)",
+        "action": "Move to 10% sampling on qualified clean/mature wafer lots",
+        "justification": "Zero observed failures across 500,000 tested dies under stop-on-fail protocol. Consumes 95.0 ms per die. Rule-of-Three 95% confidence escape upper bound is 6.00 DPPM.",
+        "test_time_saved_ms": 85.5,
+        "annual_savings_usd": 66484.8,
+        "escape_risk_dppm": 6.0,
+        "status": "REQUIRES_CCB_APPROVAL",
+        "governance": "Advisory (Subject to Product & Test Engineering Review)"
+      }
+    ],
+    "total_test_time_reduction_ms": 106.4,
+    "test_time_reduction_pct": 8.65,
+    "total_annual_savings_usd": 82736.64
+  },
+  "engine_6_yield_predictor": {
+    "validation_type": "Chronological Hold-Out (75/25) + Lot-Level 5-Fold CV",
+    "train_lots_count": 30,
+    "test_lots_count": 10,
+    "wafer_holdout": {
+      "mae_pts": 5.718,
+      "rmse_pts": 8.464,
+      "r2_score": 0.0005,
+      "baseline_mae_pts": 6.102,
+      "baseline_rmse_pts": 8.497,
+      "baseline_r2_score": -0.0074
+    },
+    "lot_holdout": {
+      "mae_pts": 2.227,
+      "rmse_pts": 2.906,
+      "r2_score": 0.3753,
+      "baseline_mae_pts": 3.588,
+      "cv_5fold_mae_pts": 1.375
+    },
+    "regressor_comparison": {
+      "Gradient Boosting": {
+        "mae_pts": 5.718,
+        "rmse_pts": 8.464,
+        "r2_score": 0.0005
+      },
+      "Random Forest": {
+        "mae_pts": 5.643,
+        "rmse_pts": 8.375,
+        "r2_score": 0.0213
+      },
+      "Extra Trees": {
+        "mae_pts": 5.596,
+        "rmse_pts": 8.439,
+        "r2_score": 0.0063
+      },
+      "HistGradientBoosting": {
+        "mae_pts": 5.598,
+        "rmse_pts": 8.332,
+        "r2_score": 0.0313
+      }
+    },
+    "wafer_mae_pts": 5.718,
+    "wafer_rmse_pts": 8.464,
+    "wafer_r2_score": 0.0005,
+    "lot_cv_mae_pts": 1.375,
+    "mae_pts": 2.227,
+    "rmse_pts": 2.906,
+    "r2_score": 0.3753,
+    "prediction_interval_coverage_pct": 70.4,
+    "top_feature_importances": {
+      "vt_n_mean": 0.2088,
+      "LITHO_reticle_id_RT-118B": 0.2047,
+      "speed_power_ratio": 0.1287,
+      "rs_poly_mean": 0.0874,
+      "vt_p_mean": 0.0838,
+      "poly_contact_prod": 0.0563,
+      "idsat_n_mean": 0.0546,
+      "wafer_slot": 0.0411,
+      "contact_chain_mean": 0.0408,
+      "CMP_equipment_id_CMP-03": 0.0128
+    }
+  }
+}

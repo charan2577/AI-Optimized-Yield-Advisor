@@ -1,0 +1,999 @@
+=== PAGE 1 ===
+TECHNICAL DESIGN DOCUMENT  ·  REV 1.0
+AI-Optimized
+Yield Advisor
+for Semiconductor Chip Testing
+Wafer sort · Final test · System-level test
+18 October 2026  ·  Prepared for engineering review  ·  Figures use synthetic data for illustration
+Document purpose. This document specifies the architecture, data model, AI methods,
+decision logic, deployment, and rollout plan for an AI-optimized Yield Advisor that sits across
+wafer sort (CP), final test (FT), and system-level test (SLT). It is written for test, product, yield,
+and data engineering leads who will review, build, and operate the system.
+Item
+Value
+Scope
+Probe (CP1/CP2), final test (FT hot/cold/room), SLT, burn-in correlation
+Primary users
+Yield engineers, test engineers, product engineers, quality, test-floor operations
+Deployment
+Hybrid: tester-cell edge agents + central lakehouse (on-prem or VPC)
+Key outcomes
++1 to 3 pts sort yield recovered, 20 to 40% faster excursion detection, 8 to 15% test time
+reduction, DPPM held or reduced
+Status
+Design for review. Targets are planning estimates to be validated in the pilot (Section 13).
+
+
+=== PAGE 2 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+2
+Contents
+ 4
+1. Executive Summary
+ 4
+2. Problem Statement and Scope
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+2.1 Where yield is lost in test
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 4
+2.2 Goals
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 5
+2.3 Non-goals
+5
+3. Yield Fundamentals Used by the System
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 5
+3.1 Definitions
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 5
+3.2 Random-defect yield models
+6
+4. System Architecture
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 7
+4.1 Layers
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 7
+4.2 Latency tiers
+7
+5. Data Foundation
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 7
+5.1 Sources
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 8
+5.2 STDF V4 records consumed
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 8
+5.3 Die identity and genealogy
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 8
+5.4 Core tables
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 8
+5.5 Data quality gates
+9
+6. AI Engines
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 9
+6.1 Wafer Map Pattern AI
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 10
+6.2 Excursion Detector
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 10
+6.3 Root Cause Engine
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 11
+6.4 Adaptive Test Limits and Outlier Screening
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 12
+6.5 Test Time Optimizer
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 13
+6.6 Yield Prediction
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 13
+6.7 Model summary
+13
+7. Advisor Layer: Recommendation Logic
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 13
+7.1 Scoring
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 14
+7.2 Action catalogue
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 14
+7.3 LLM copilot
+14
+8. Human-in-the-Loop and Governance
+ 15
+9. MLOps and Model Lifecycle
+ 15
+10. Deployment and Integration
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 15
+10.1 Topology
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 15
+10.2 Integrations
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16
+10.3 Performance and sizing (10k wafers per month)
+
+
+=== PAGE 3 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+3
+16
+11. Security and IP Protection
+ 16
+12. KPIs and ROI Model
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16
+12.1 KPIs
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16
+12.2 Worked example (illustrative)
+17
+13. Implementation Roadmap
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 17
+13.1 Team
+18
+14. Risks and Mitigations
+ 18
+15. Appendix
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 18
+15.1 Glossary
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 18
+15.2 Pareto view used in the cockpit
+  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 19
+15.3 References
+
+
+=== PAGE 4 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+4
+1. Executive Summary
+Semiconductor test generates terabytes of per-die parametric and functional data every week, yet
+most of it is consumed only as pass/fail bins and weekly yield charts. Yield loss is found late, root
+cause takes days of manual commonality analysis, test limits are static compromises between
+overkill and escapes, and test programs carry redundant items that cost tester time on every unit.
+The Yield Advisor turns that data into ranked, explainable, actionable recommendations. It
+combines five AI engines over a shared die-level data foundation:
+  Wafer Map Pattern AI classifies spatial failure signatures (edge ring, scratch, center, cluster
+and others) on every wafer within seconds of sort completion and links each signature to its
+likely process or probe cause.
+ Excursion Detector flags yield and parametric shifts with EWMA/CUSUM and multivariate
+anomaly models, catching small sustained shifts that Shewhart charts miss.
+ Root Cause Engine ranks equipment, chamber, recipe, probe card, tester, and material factors
+by their contribution to the loss using gradient-boosted models with SHAP attribution and
+classical commonality statistics.
+ Adaptive Limits and Outlier Screening applies Dynamic Part Average Testing (DPAT),
+Good-Die-in-Bad-Neighborhood (GDBN/NNR), and multivariate Mahalanobis screens to remove
+latent-defect die that pass specification limits.
+ Test Time Optimizer identifies redundant or low-coverage test items and proposes sampling or
+removal under an explicit, statistically bounded escape risk.
+An Advisor layer scores every candidate action by expected yield or cost benefit, confidence, and
+quality risk, then presents it with evidence. An LLM copilot grounded with retrieval over historical
+8D reports, failure analysis, and test program documentation explains findings in plain language
+and drafts change requests. No test program, limit, or disposition changes without human approval
+through the existing change control process.
+ Bottom line: for a product line running 10,000 wafers a month, recovering 1.5 yield points and
+cutting 10% of test time is worth on the order of USD 9 to 10 million per year (worked example
+in Section 12), with a 12-month phased rollout starting from a read-only pilot.
+2. Problem Statement and Scope
+2.1 Where yield is lost in test
+Stage
+Typical loss mechanisms
+Pain today
+Wafer sort (CP)
+Process defects, parametric drift, probe
+contact and card wear, prober temperature,
+edge die
+Spatial patterns reviewed manually for a sample
+of wafers; probe vs. process loss confused
+Final test (FT)
+Assembly damage, package stress, thermal
+and speed binning loss, handler contact
+Correlation to sort data is manual; retest policy
+fixed rather than data-driven
+System-level
+test
+Marginal timing, power integrity, firmware
+interaction
+Fails discovered late and expensive; weak link
+back to die-level history
+Field / RMA
+Latent defects that passed all test
+Escapes traced back by hand; screening rules
+added reactively
+2.2 Goals
+  Detect yield excursions within one lot of onset rather than at the weekly review.
+
+
+=== PAGE 5 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+5
+ Cut mean time to root cause (MTTRC) from days to hours for the top-loss signatures.
+ Recover yield lost to overkill (good die rejected) without raising escapes.
+ Reduce DPPM through statistically grounded outlier screening.
+ Reduce test time per unit through evidence-based test content optimization.
+ Give every recommendation a quantified benefit, a confidence, and a traceable evidence trail.
+2.3 Non-goals
+  Autonomous changes to production test programs. The system recommends; humans release.
+ Replacing fab-side defect inspection or process control systems. The Advisor consumes their
+data.
+ Design-for-test (DFT) pattern generation. ATPG remains in the EDA flow; the Advisor supplies
+feedback on pattern effectiveness.
+3. Yield Fundamentals Used by the System
+The Advisor's quantitative reasoning rests on standard yield definitions so that its outputs reconcile
+with existing yield reports.
+3.1 Definitions
+Metric
+Definition
+Wafer sort yield
+Ysort = good die / gross die per wafer (GDPW), per wafer, lot, and product
+Line-to-ship yield
+Ytotal = Yline x Ysort x Yassy x YFT x YSLT
+Systematic vs. random
+Ysort = Ysys x Yrand. Spatial patterns and parametric shifts drive Ysys; distributed defects
+drive Yrand
+Overkill
+Good die rejected by test (false fail). Estimated from retest recovery, guard-band analysis,
+and downstream correlation
+Underkill (escape)
+Defective die passed by test. Measured as DPPM from downstream fails and field returns
+Test escape DPPM
+DPPM = escapes / units shipped x 106
+Retest recovery rate
+Share of first-pass fails that pass on retest, by bin. High rates indicate contact or limit
+issues
+3.2 Random-defect yield models
+For a die of critical area A and defect density D0, the Advisor fits the negative binomial model,
+which reduces to Poisson as the clustering parameter grows:
+ Yrand = (1 + A D0 / α)-α
+Fitting D0 and α per wafer from the non-patterned fail density lets the system separate the random
+component from systematic loss. That split decides who owns the recovery: the fab (defect
+density) or test and product engineering (systematic and test-induced loss).
+
+
+=== PAGE 6 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+6
+Figure 1. Random-defect yield vs. die area under common models. Lower α means stronger defect clustering and
+higher yield for the same D₀.
+4. System Architecture
+Figure 2. Logical architecture. Data flows from test and fab sources through streaming ingest into a lakehouse and
+feature store, feeds five AI engines, and converges on the Advisor, which drives a gated control loop.
+
+
+=== PAGE 7 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+7
+4.1 Layers
+Layer
+Responsibility
+Reference technology
+Edge agent (per
+tester cell)
+Tail STDF as it is written, parse, push to stream;
+run low-latency models (DPAT, NNR, real-time
+contact alarms)
+Rust STDF parser, ONNX Runtime, gRPC
+Streaming
+Durable event bus, one topic per site and stage,
+exactly-once delivery to storage
+Apache Kafka or Redpanda
+Lakehouse
+Die, wafer, lot, and test-item tables with time
+travel for reproducible analysis
+Delta Lake or Apache Iceberg on object
+storage; Spark / Trino
+Feature store
+Offline features for training, online features under
+50 ms for edge scoring
+Feast or equivalent; Redis online store
+Model serving
+Batch scoring per wafer and lot, online scoring for
+edge models
+Ray Serve or KServe; ONNX
+Advisor service
+Recommendation scoring, evidence assembly, LLM
+copilot, workflow integration
+Python service, vector index, LLM API
+Presentation
+Yield cockpit, wafer map viewer, recommendation
+inbox, APIs
+Web UI, REST/GraphQL, MES and
+ticketing connectors
+4.2 Latency tiers
+Tier
+Budget
+Examples
+Real time
+< 1 s per die
+Contact resistance drift, consecutive-fail stop, NNR on the fly
+Near real time
+< 2 min after wafer end
+Wafer map classification, DPAT final limits, wafer disposition advice
+Lot
+< 15 min after lot end
+Excursion detection, retest recommendation, lot hold advice
+Analytical
+Hours to daily
+Root cause ranking, test time optimization, model retraining
+5. Data Foundation
+Model quality is bounded by data joins. The most important design decision is a die-level record
+keyed by a stable identity that survives from wafer sort through final test and into the field.
+5.1 Sources
+Source
+Content
+Format / cadence
+ATE test results
+Per-die parametric (PTR), multi-result (MPR), functional
+(FTR) results, bins, test times
+STDF V4 per wafer or lot; streaming
+MES and genealogy
+Lot history, route, equipment, chamber, recipe,
+timestamps, splits and merges
+Database / API; event-driven
+Fab metrology
+WAT/PCM e-test, inline CD and film, defect inspection
+maps
+CSV, KLARF; per lot
+Probe / handler logs
+Probe card ID and touchdowns, cleaning events, chuck
+temperature, handler site, jams
+Equipment logs, SECS/GEM
+DFT diagnosis
+Scan fail logs, diagnosed suspect nets and cells
+Diagnosis tool reports
+Quality
+8D reports, failure analysis, RMA and field returns
+Documents, QMS records
+
+
+=== PAGE 8 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+8
+5.2 STDF V4 records consumed
+Record
+Name
+Use in the Advisor
+MIR / MRR
+Master Information / Results
+Lot, product, tester, program revision, start/end time
+WIR / WRR / WCR
+Wafer Information / Results /
+Configuration
+Wafer ID, die counts, flat orientation, coordinate system
+PIR / PRR
+Part Information / Results
+Die X/Y, site, hard and soft bin, test time, pass/fail
+PTR
+Parametric Test Record
+Per-test value, limits, units: the main input to DPAT and
+modeling
+MPR
+Multiple-Result Parametric
+Pin-level results (leakage, continuity) for pin-pattern features
+FTR
+Functional Test Record
+Vector fail counts and fail pins for scan and memory
+signatures
+HBR / SBR
+Hard / Soft Bin Records
+Bin definitions and summary counts for reconciliation
+TSR
+Test Synopsis
+Per-test execution counts and times for test time
+optimization
+5.3 Die identity and genealogy
+Each die carries a canonical key (fab, lot, wafer, x, y). Where the design includes an
+electronic chip ID (ECID) fuse, it is read at sort and at final test so that FT, SLT, and field results join
+back to the exact wafer location. Without ECID, the system uses assembly lot traceability and
+reports joins as probabilistic, with that uncertainty carried into any downstream model.
+5.4 Core tables
+ die_result     (die_key, stage, insertion, temp, site, hbin, sbin, pass, test_time_ms,
+                tester_id, probe_card_id, program_rev, ts)
+test_value     (die_key, stage, insertion, test_num, test_name, value, lo_lim, hi_lim, unit)
+wafer_summary  (wafer_key, stage, gross, good, yield, pattern_class, pattern_conf, d0, alpha)
+lot_context    (lot_key, step, equipment_id, chamber, recipe, ts_in, ts_out)
+recommendation (rec_id, type, scope, expected_gain, confidence, risk, evidence_uri,
+                status, owner, created_ts, decided_ts)
+Volume planning: a 10,000 wafers per month line at 600 GDPW and 2,000 parametric tests per die
+produces about 12 billion test values a month. Columnar storage with dictionary encoding brings
+this to roughly 1.5 to 3 TB per month for the test_value table.
+5.5 Data quality gates
+  Schema and record-order validation for every STDF file; files with missing PRR or truncated
+records are quarantined.
+ Limit consistency: program revision and limits are versioned; a value is never compared against
+limits from a different revision.
+ Coordinate normalization to a common notch-down orientation before any spatial model.
+ Duplicate and retest handling: every insertion is kept, flagged by insertion number, and a
+final-disposition view is derived.
+ Completeness monitors per tester and site so that missing data is never mistaken for a yield
+change.
+
+
+=== PAGE 9 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+9
+6. AI Engines
+6.1 Wafer Map Pattern AI
+Task. Classify each wafer's pass/fail map (and optionally per-bin maps) into failure signature
+classes, localize the pattern, and estimate the die lost to it.
+Figure 3. Representative spatial signatures. Each class maps to a family of likely causes that the Root Cause Engine
+then tests.
+Signature
+Typical causes
+First check
+Edge-Ring
+Etch or deposition uniformity, bevel issues, edge bead
+removal
+Process chamber, edge exclusion
+Center
+CMP non-uniformity, spin-coat thickness, thermal
+center hot spot
+CMP tool, track, anneal
+Donut
+Thermal or plasma ring non-uniformity
+Chamber heater zones, RF
+Edge-Loc / Loc
+Handling contact, localized particles, chuck
+contamination
+Wafer handler, chuck
+Scratch
+Mechanical handling, CMP slurry agglomerates
+CMP pad, robot end effector
+Repeating reticle
+Mask defect or stepper field issue
+Reticle ID, exposure field map
+Probe-induced
+Bad needle, card planarity, site-specific contact
+Probe card, site-to-site yield
+Model. A convolutional network (ResNet-18 scale) on maps resampled to 64 x 64, with a
+three-channel input (fail, bin class group, die-valid mask). A vision transformer variant is evaluated
+in the pilot. Mixed-type wafers (two patterns at once) are handled as multi-label with sigmoid
+outputs; a segmentation head (U-Net) outlines the pattern region so lost die can be counted.
+Training data. Public WM-811K (811,457 maps, of which about 172,950 are labeled into 9 classes)
+and MixedWM38 for pre-training, then fine-tuned on in-house labeled wafers. Class imbalance (the
+majority are 'none') is handled with focal loss, rotation and flip augmentation (patterns are
+rotation-equivariant), and synthetic pattern injection.
+
+
+=== PAGE 10 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+10
+Open-set handling. New signatures must not be forced into known classes. An energy-score
+out-of-distribution detector routes low-confidence wafers to an 'unknown' queue; embeddings are
+clustered weekly (HDBSCAN) so engineers can label new classes.
+Targets. Macro F1 at or above 0.93 on in-house hold-out, at least 0.85 recall on each rare class,
+classification under 200 ms per wafer on CPU.
+6.2 Excursion Detector
+Task. Detect statistically meaningful shifts in yield, bin rates, and key parametric distributions at
+the earliest possible lot.
+Figure 4. A sustained shift of about 1.7σ begins at lot 78. EWMA accumulates evidence across lots; a Shewhart chart
+reacts only to single extreme points. On real data EWMA typically signals small shifts several lots earlier.
+Methods. The detector layers several complementary checks:
+  Univariate EWMA and CUSUM charts on yield, each top soft bin, and the median and spread of
+critical parametrics, by product, tester, and probe card.
+ Multivariate monitoring with Hotelling T2 on PCA-reduced parametric signatures per wafer,
+catching shifts spread across many tests that are individually in control.
+ Isolation Forest on wafer-level feature vectors (pattern probabilities, bin mix, parametric
+moments) for novel anomalies.
+ Change-point detection (PELT) for retrospective dating of when a shift began, which narrows the
+root cause search window.
+False alarm control uses Benjamini-Hochberg across the many simultaneous charts, so engineers
+are not flooded. Alarm thresholds target an in-control average run length of about 500 lots per
+chart family.
+6.3 Root Cause Engine
+Task. Given an excursion or a persistent loss signature, rank the factors most likely responsible.
+Commonality analysis. For every process step, compare the distribution of affected vs.
+unaffected wafers across equipment and chambers using chi-square or Fisher exact tests, and
+Kruskal-Wallis for continuous responses. This is the classical method engineers already trust and it
+anchors the ranking.
+
+
+=== PAGE 11 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+11
+Model-based attribution. A gradient-boosted tree model (LightGBM) predicts wafer yield loss or
+signature probability from routing, equipment, timing (queue times), WAT, and probe context.
+SHAP values give each factor's contribution per wafer and in aggregate. Interaction values expose
+combinations such as 'chamber B only after a PM'.
+Causal guardrails. Equipment assignment is confounded with time and product mix. The engine
+adjusts for these with stratification and, for important decisions, runs a double machine learning
+estimate of the effect of a suspected tool with time and product as controls. Each ranked factor is
+reported with effect size, p-value, wafers affected, and the time window, and is labeled
+'association' unless a split-lot or tool-down experiment confirms it.
+Output example.
+Rank
+Factor
+Evidence
+Est. loss
+Confidence
+1
+Etch ETCH-07 chamber C,
+after PM on 9 Oct
+Edge-Ring rate 31% vs 4% baseline; Fisher
+p < 1e-9; SHAP top
+1.8 pts
+High
+2
+Probe card PC-4412 site 3
+Site 3 yield 3.1 pts below other sites;
+contact Rc trend rising
+0.6 pts
+High
+3
+WAT Vt_n shift +18 mV on
+lots 2214-2229
+Correlates with SB07 Vmin (r = 0.62)
+0.4 pts
+Medium
+6.4 Adaptive Test Limits and Outlier Screening
+Task. Remove die that pass specification limits but are statistically abnormal (latent reliability
+risk), and right-size guard bands to cut overkill.
+Figure 5. DPAT on one wafer. Limits computed from the wafer's own robust distribution flag outliers that sit well
+inside the specification limits.
+Part Average Testing. Following the AEC-Q001 guideline, static PAT limits are set at a robust
+mean plus or minus 6 robust sigma from qualification data; dynamic PAT recomputes them per
+wafer or lot:
+ robust_mean  = median(x)
+robust_sigma = (Q3 - Q1) / 1.35
+DPAT limits  = robust_mean +/- k * robust_sigma      (k = 6 default, tuned per test)
+apply only if within spec:  max(LSL, low)  ...  min(USL, high)
+ Good Die in Bad Neighborhood (GDBN). A passing die surrounded by failing die carries
+elevated latent defect risk. The engine computes a weighted neighbor fail score and also applies
+
+
+=== PAGE 12 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+12
+cluster-based rules for die inside or bordering a detected pattern region.
+ Nearest Neighbor Residual (NNR). For spatially trending parametrics such as IDDQ, a die's
+value is compared with the median of its neighbors rather than with the whole wafer, which
+catches outliers that wafer-level PAT hides.
+ Multivariate PAT. Robust Mahalanobis distance (Minimum Covariance Determinant) across
+correlated tests, for example IDDQ at several voltages, catches die normal on each test but
+abnormal in combination.
+ Guard-band optimization. Using retest data and downstream correlation, the engine
+estimates measurement repeatability per test and proposes guard bands sized to the measured
+gauge uncertainty instead of legacy fixed margins. This is the main lever for recovering overkill.
+Calibration to quality. Every screen is evaluated on yield cost and DPPM benefit, using burn-in
+and field return labels where available. A screen is recommended only if its expected DPPM
+reduction per yield point lost exceeds the product's quality-cost threshold.
+6.5 Test Time Optimizer
+Task. Reduce tester seconds per unit without raising escapes.
+Figure 6. Candidate test items for sampling or removal in an example flow. Removal is proposed only when
+unique-fail coverage is below the risk bound.
+ Redundancy analysis. For each test, count 'unique fails': die that fail only this test. Tests with
+near-zero unique fails over millions of units are candidates. Correlated parametrics (r > 0.98)
+suggest one test can predict another.
+ Risk bound. With zero unique fails in n units, the 95% upper bound on the escape rate from
+removing a test is about 3/n (rule of three). Removal is proposed only when this bound is below
+the DPPM budget allocated to test optimization.
+ Adaptive test. A per-die model predicts pass probability from early tests and sort history;
+low-risk die skip expensive items while a random audit sample (for example 2%) always runs the
+full flow to keep the model honest.
+ Test reordering. Tests with high fail probability per second run earlier so that failing die stop
+sooner under stop-on-fail.
+
+
+=== PAGE 13 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+13
+6.6 Yield Prediction
+A per-lot model predicts sort yield and bin mix from WAT and inline data before the lot reaches
+probe. This supports capacity planning and lets the Advisor flag lots likely to excurse so the test
+floor can prepare extra sampling. Model: gradient boosting with quantile outputs (P10, P50, P90);
+target mean absolute error under 1.2 yield points.
+6.7 Model summary
+Engine
+Primary model
+Inputs
+Key metric (target)
+Wafer map
+CNN / ViT + U-Net, OOD energy
+score
+Die pass/fail and bin maps
+Macro F1 >= 0.93
+Excursion
+EWMA, CUSUM, Hotelling T2,
+Isolation Forest
+Lot and wafer KPIs
+Detect 1.5σ shift within 3 lots
+Root cause
+LightGBM + SHAP; commonality
+tests; DML
+Genealogy, WAT, probe
+context
+True cause in top 3 >= 80%
+Outliers
+DPAT, NNR, GDBN, robust
+Mahalanobis
+Per-die parametrics,
+neighbors
+DPPM down at < 0.3 pt yield
+cost
+Test time
+Unique-fail analysis, adaptive test
+classifier
+Per-test results, TSR times
+8 to 15% time cut, no escape
+increase
+Yield forecast
+Quantile gradient boosting
+WAT, inline, history
+MAE < 1.2 pts
+7. Advisor Layer: Recommendation Logic
+Each engine emits candidate actions. The Advisor normalizes them into one inbox ranked by
+risk-adjusted value, so a yield engineer sees the most valuable decision first, whatever engine
+produced it.
+7.1 Scoring
+ score = P(correct) x expected_benefit_usd  -  expected_quality_cost_usd  -  effort_cost_usd
+expected_benefit_usd   = recovered_die/month x die_value  +  tester_sec_saved x cost_per_sec
+expected_quality_cost  = delta_DPPM x units x cost_per_escape   (escape cost set by customer tier)
+P(correct)             = calibrated model confidence (isotonic regression on past outcomes)
+Confidence is calibrated against the outcome of previous recommendations, so a stated 80%
+means roughly four in five similar recommendations were confirmed. Actions that touch shipped
+quality (limit widening, test removal) also need the DPPM bound check from Section 6.5 to pass
+before they can appear.
+
+
+=== PAGE 14 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+14
+7.2 Action catalogue
+Action type
+Example
+Approval
+Investigate
+Open a case for Edge-Ring rise on ETCH-07 C with evidence pack
+Yield engineer
+Equipment
+Recommend chamber inhibit pending PM check
+Process owner via MES
+Probe
+Clean or replace probe card PC-4412; adjust touchdown count
+limit
+Test floor lead
+Retest
+Retest SB30 contact fails on lot 2231 (expected recovery 72%)
+Auto within policy, else test
+engineer
+Disposition
+Ink 18 DPAT outliers; GDBN ink ring around cluster
+Quality engineer
+Limit change
+Tighten IDDQ PAT k from 6 to 5 for automotive grade
+Change control board
+Test content
+Move TEST_4120 to 5% sampling (bound 0.6 DPPM)
+Change control board
+7.3 LLM copilot
+A language model makes the evidence accessible: engineers ask questions such as 'why did lot
+2214 drop on SB07?' and receive an answer assembled from engine outputs, charts, and similar
+past cases.
+  Grounding. Retrieval over 8D reports, FA results, test program release notes, and specification
+documents, indexed by product and signature. Every claim in an answer links to its source
+record.
+ Tool use. The copilot calls the same query APIs as the UI (yield by factor, wafer maps,
+commonality runs). It never calculates statistics itself; numbers come from the engines.
+ Drafting. It drafts 8D D2 to D4 sections, change request justifications, and shift handover
+summaries for human editing.
+ Guardrails. Read-only data access, no direct write path to test programs or MES, refusal when
+evidence is insufficient, and logging of every prompt and response for audit.
+8. Human-in-the-Loop and Governance
+Test programs and limits are controlled quality documents, and in automotive and medical markets
+they are tied to customer-approved control plans. The Advisor fits that process rather than
+bypassing it.
+  Autonomy levels. Level 0 (inform), Level 1 (recommend, human executes), Level 2
+(auto-execute within a pre-approved policy, such as retest of contact bins up to a cap).
+Production starts at Level 1; only explicitly approved policies run at Level 2.
+ Change control. Limit and content changes generate a change request with evidence pack,
+risk bound, and rollback plan, routed to the existing change control board. Automotive products
+follow PPAP and customer notification rules.
+ Traceability. Every recommendation stores model version, data snapshot, and decision, so any
+shipped unit's test conditions can be reconstructed.
+ Feedback. Accept, reject, and outcome labels feed retraining and confidence calibration.
+Rejection reasons are mandatory picklists so the system learns why.
+
+
+=== PAGE 15 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+15
+9. MLOps and Model Lifecycle
+Stage
+Practice
+Versioning
+Data snapshots via lakehouse time travel; models, features, and thresholds in a registry
+(MLflow)
+Validation
+Hold-out by time (never random split) to mimic deployment; per-product and per-tester slices;
+rare-class recall gates
+Shadow mode
+New models run beside production for at least 4 weeks; recommendations compared but not
+shown
+Release
+Staged by product family; automatic rollback if acceptance rate or calibration degrades
+Drift monitoring
+Population stability index on key features; prediction distribution and OOD rate per model;
+alerts on program revision changes
+Retraining
+Scheduled monthly plus event-triggered on new product, new program revision, or drift alarm
+Explainability
+SHAP summaries, Grad-CAM overlays on wafer maps, evidence links in every recommendation
+New-product introduction is the hardest case because no history exists. The system uses transfer
+learning from sibling products for wafer map models, falls back to commonality statistics and DPAT
+(which need no training) for the first lots, and switches to product-specific models once enough
+wafers are labeled.
+10. Deployment and Integration
+10.1 Topology
+  Edge. One agent per tester cell or per group of testers, on a small server on the test floor
+network. It never blocks the tester: if the agent is down, testing continues and data backfills.
+ Central. Lakehouse, model training, and Advisor services in the company's data center or a
+dedicated cloud VPC. Multi-site deployments keep raw data in region and replicate only
+aggregates when data residency requires it.
+ OSAT and foundry data. Partners deliver STDF through secured transfer; a partner-facing
+ingest validates and maps it to the canonical schema.
+10.2 Integrations
+System
+Direction
+Purpose
+ATE (Advantest, Teradyne and
+others)
+In
+STDF stream; optional real-time API for stop-on-alarm
+Prober / handler
+In
+Temperature, touchdowns, alarms (SECS/GEM)
+MES
+In / out
+Genealogy in; hold and inhibit recommendations out through
+approved transactions
+Inking / map server
+Out
+Updated wafer maps with outlier inks after approval
+Existing yield tools
+In / out
+Coexists with tools such as Exensio, yieldWerx, or in-house YMS;
+exchanges signatures and recommendations
+Ticketing / QMS
+Out
+Cases, change requests, 8D drafts
+
+
+=== PAGE 16 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+16
+10.3 Performance and sizing (10k wafers per month)
+Component
+Sizing
+Ingest
+Peak 20 MB/s STDF across 60 testers; 3-broker Kafka cluster
+Storage
+about 3 TB/month compressed, 24-month hot retention, archive after
+Compute
+Spark cluster 16 to 32 vCPU for daily jobs; 1 GPU for wafer map training; CPU inference
+Availability
+Edge 99.9% (non-blocking); Advisor 99.5%; RPO 1 h, RTO 4 h
+11. Security and IP Protection
+  Test data reveals design and process IP. All data is encrypted in transit (TLS 1.3) and at rest
+(AES-256) with customer-managed keys.
+ Role-based and attribute-based access control: product teams see their products; partners see
+only their own lots.
+ Fabless and OSAT multi-tenancy uses separate storage namespaces and key per tenant;
+cross-tenant learning uses only model weights trained on approved data or federated updates.
+ The LLM copilot runs on an enterprise endpoint with no training on customer prompts; retrieval
+respects the same access controls as the UI.
+ Audit logging of all data access, recommendation decisions, and copilot sessions, aligned with
+ISO 27001 and, for automotive, TISAX expectations.
+12. KPIs and ROI Model
+12.1 KPIs
+KPI
+Baseline (typical)
+Target after 12 months
+Excursion detection latency
+3 to 7 days (weekly review)
+< 1 lot / < 24 h
+Mean time to root cause
+3 to 10 days
+< 1 day for known signatures
+Wafers with classified signature
+Sample-based manual review
+100%, automatic
+Overkill (retest-recoverable loss)
+1 to 3% of fails
+Halved
+Test time per unit
+Baseline
+-8 to -15%
+Escape DPPM
+Baseline
+Equal or lower, never higher
+Recommendation acceptance rate
+n/a
+> 60%, with confirmed-benefit rate > 70%
+12.2 Worked example (illustrative)
+Assumption
+Value
+Wafers per month
+10,000
+Gross die per wafer
+600
+Value per good die
+USD 8
+Sort yield recovered
+1.5 points
+Units through final test per month
+5.4 million
+Test time per unit / tester cost
+4.0 s / USD 0.012 per second
+Test time reduction
+10%
+
+
+=== PAGE 17 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+17
+Benefit line
+Calculation
+Per month
+Per year
+Yield recovery
+10,000 x 600 x 1.5% x USD 8
+USD 720,000
+USD 8.64 M
+Test time
+5.4 M x 0.4 s x USD 0.012
+USD 25,920
+USD 0.31 M
+Engineering time
+approx. 4 FTE of analysis effort redeployed
+USD 50,000
+USD 0.60 M
+Total
+USD 795,920
+USD 9.55 M
+Against an estimated first-year cost of USD 1.5 to 2.5 million (team, infrastructure, licenses),
+payback falls within the first two to four months of full deployment. Escape-cost avoidance from
+outlier screening is excluded from the total because it depends heavily on market; for automotive
+products it is often the largest benefit.
+13. Implementation Roadmap
+Phase
+Duration
+Scope
+Exit criteria
+0. Foundation
+Months 1-2
+STDF ingest from 1 site, die table, genealogy
+join, data quality gates, yield cockpit
+> 99% of wafers ingested within 10
+min; joins validated against YMS
+1. Pilot
+(read-only)
+Months 3-5
+Wafer map AI, excursion detector,
+commonality RCA on 2 product families;
+shadow recommendations
+Macro F1 >= 0.90; 3 confirmed
+root causes found faster than
+baseline
+2. Advise
+Months 6-8
+Advisor inbox, LLM copilot, DPAT/NNR
+recommendations, retest advice, ticketing
+integration
+Acceptance > 50%; measured yield
+gain > 0.5 pt on pilot products
+3. Optimize
+Months
+9-12
+Guard-band and test time optimization
+through change control; Level 2 retest policy;
+multi-site rollout
+Test time -8% on one product with
+no DPPM increase over 3 months
+4. Scale
+Year 2
+All products, OSAT data, yield forecasting,
+federated cross-site learning
+Program KPIs in Section 12 met
+13.1 Team
+Core team of 8 to 10: product owner (senior yield engineer), 2 data engineers, 2 ML engineers, 1
+test engineer embedded full-time, 1 software engineer for UI and integrations, 1 MLOps/platform
+engineer, and part-time quality and IT security representatives.
+
+
+=== PAGE 18 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+18
+14. Risks and Mitigations
+Risk
+Impact
+Mitigation
+Poor genealogy or
+missing ECID
+Weak RCA and
+FT-to-sort correlation
+Phase 0 data audit; probabilistic joins with flagged
+uncertainty; push for ECID on new designs
+Alarm fatigue
+Engineers ignore the
+system
+FDR control, risk-adjusted ranking, daily digest, per-user
+tuning
+Spurious correlation in
+RCA
+Wrong tool blamed,
+wasted effort
+Commonality plus model agreement, confounder adjustment,
+'association' labeling, experiment suggestions
+Test removal causes
+escapes
+Customer quality
+incident
+Rule-of-three bound, audit sampling, staged rollout, automatic
+revert on any downstream rise
+Model drift after program
+change
+Silent accuracy loss
+Program revision as an explicit feature and drift trigger;
+shadow re-validation
+LLM hallucination
+Misleading explanation
+Tool-sourced numbers only, citation required, refusal on low
+evidence, audit log
+Change resistance
+Low adoption
+Embedded test engineer, transparent evidence, start with
+time-saving analytics before recommendations
+15. Appendix
+15.1 Glossary
+Term
+Meaning
+ATE
+Automatic test equipment
+CP / FT / SLT
+Chip probe (wafer sort) / final test / system-level test
+DPAT
+Dynamic part average testing: outlier limits recomputed per wafer or lot
+DPPM
+Defective parts per million shipped
+ECID
+Electronic chip ID fused into each die
+GDBN
+Good die in bad neighborhood
+GDPW
+Gross die per wafer
+NNR
+Nearest neighbor residual
+Overkill / underkill
+Good die rejected / bad die shipped
+PAT
+Part average testing (AEC-Q001)
+SHAP
+Shapley additive explanations for model attribution
+STDF
+Standard Test Data Format (V4) used by ATE
+WAT / PCM
+Wafer acceptance test / process control monitor e-test
+15.2 Pareto view used in the cockpit
+
+
+=== PAGE 19 ===
+AI-Optimized Yield Advisor  ·  Technical Design Document
+Rev 1.0  ·  Oct 2026
+19
+Figure 7. Soft-bin Pareto for one week. The Advisor links each top bin to its signature, root cause ranking, and open
+recommendations.
+15.3 References
+  Automotive Electronics Council, AEC-Q001 Rev-D, Guidelines for Part Average Testing.
+ Automotive Electronics Council, AEC-Q002, Guidelines for Statistical Yield Analysis.
+ Teradyne, Standard Test Data Format (STDF) Specification V4.
+ Wu, M.-J., Jang, J.-S. R., Chen, J.-L., 'Wafer Map Failure Pattern Recognition and Similarity Ranking
+for Large-Scale Data Sets', IEEE Trans. Semiconductor Manufacturing, 2015 (WM-811K).
+ Wang, J. et al., 'Deformable Convolutional Networks for Efficient Mixed-type Wafer Defect Pattern
+Recognition', IEEE TSM, 2020 (MixedWM38).
+ Lundberg, S., Lee, S.-I., 'A Unified Approach to Interpreting Model Predictions', NeurIPS 2017.
+ Montgomery, D. C., Introduction to Statistical Quality Control, Wiley (EWMA and CUSUM design).
+ Chernozhukov, V. et al., 'Double/Debiased Machine Learning for Treatment and Structural
+Parameters', Econometrics Journal, 2018.
+
+

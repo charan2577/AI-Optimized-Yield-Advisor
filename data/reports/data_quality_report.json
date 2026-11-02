@@ -1,0 +1,106 @@
+{
+  "timestamp": "2026-11-02T18:15:16.483549",
+  "summary": {
+    "total_lots": 40,
+    "total_wafers": 1000,
+    "total_ft_records": 446715,
+    "gross_die_per_wafer": 500,
+    "mean_final_yield": 0.8934,
+    "mean_first_pass_yield": 0.8915,
+    "burnin_failures": 700
+  },
+  "missing_values": {
+    "lots": {
+      "lot_id": 0,
+      "product": 0,
+      "fab": 0,
+      "technology": 0,
+      "wafer_count": 0,
+      "fab_start_ts": 0,
+      "sort_start_ts": 0,
+      "tester_id": 0,
+      "probe_card_id": 0,
+      "program_rev": 0,
+      "prober_temp_c": 0
+    },
+    "wafer_summary": {
+      "lot_id": 0,
+      "wafer_id": 0,
+      "gross_die": 0,
+      "good_die": 0,
+      "first_pass_yield": 0,
+      "final_yield": 0,
+      "sort_start_ts": 0
+    },
+    "test_limits": {
+      "test_num": 0,
+      "test_name": 0,
+      "unit": 0,
+      "lo_limit": 7,
+      "hi_limit": 2,
+      "soft_bin": 0,
+      "hard_bin": 0,
+      "test_time_ms": 0,
+      "program_rev": 0,
+      "soft_bin_name": 0
+    },
+    "mes": {
+      "lot_id": 0,
+      "wafer_id": 0,
+      "step": 0,
+      "equipment_id": 0,
+      "chamber": 7000,
+      "reticle_id": 7000,
+      "recipe": 0,
+      "ts_in": 0,
+      "ts_out": 0
+    },
+    "wat_pcm": {
+      "lot_id": 0,
+      "wafer_id": 0,
+      "wat_site": 0,
+      "site_x": 0,
+      "site_y": 0,
+      "vt_n_mV": 0,
+      "vt_p_mV": 0,
+      "idsat_n_uA_um": 0,
+      "rs_poly_ohm_sq": 0,
+      "contact_chain_ohm": 0
+    },
+    "final_test": {
+      "ecid": 0,
+      "lot_id": 0,
+      "wafer_id": 0,
+      "die_x": 0,
+      "die_y": 0,
+      "assembly_lot": 0,
+      "ft_stage": 0,
+      "ft_pass": 0,
+      "ft_soft_bin": 0,
+      "ft_fmax_mhz": 0,
+      "burnin_fail": 0
+    }
+  },
+  "duplicate_checks": {
+    "lots_unique_keys": true,
+    "wafer_summary_unique_keys": true,
+    "mes_duplicate_rows": 0,
+    "ft_ecid_unique": true
+  },
+  "relational_integrity": {
+    "all_lots_in_summary": true,
+    "all_mes_lots_in_lots": true,
+    "all_ft_lots_in_lots": true,
+    "wafers_per_lot_uniform_25": true,
+    "total_lots": 40,
+    "total_wafers": 1000,
+    "mes_wafer_coverage_pct": 100.0
+  },
+  "stop_on_fail_protocol": {
+    "sample_size": 5000,
+    "stop_on_fail_violations": 0,
+    "compliance_rate_pct": 100.0,
+    "interpretation": "Complies strictly with ATE stop-on-fail tester protocol."
+  },
+  "verdict": "DATASET_VALIDATED_HEALTHY"
+}
